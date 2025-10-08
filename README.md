@@ -4,9 +4,9 @@
 
 ## 개요 (Overview)
 
-이 프로젝트는 FastAPI를 사용한 기본적인 RESTful API 웹 서비스입니다. CRUD(Create, Read, Update, Delete) 작업을 수행할 수 있는 예제 엔드포인트를 포함하고 있습니다.
+이 프로젝트는 FastAPI를 사용하여 이미지 파일의 EXIF 메타데이터를 분석하고 편집할 수 있는 웹 서비스를 제공합니다.
 
-This project is a basic RESTful API web service using FastAPI. It includes example endpoints for performing CRUD (Create, Read, Update, Delete) operations.
+This project is a FastAPI-based web service for analysing and editing EXIF metadata from image files.
 
 ## 기능 (Features)
 
@@ -58,7 +58,7 @@ python main.py
 uvicorn main:app --reload
 ```
 
-서버는 기본적으로 `http://localhost:8000`에서 실행됩니다.
+서버는 기본적으로 `http://localhost:8000`에서 실행됩니다. 웹 브라우저에서 `http://localhost:8000`을 열면 이미지 업로드 및 분석 UI를 사용할 수 있습니다.
 
 ### API 문서 (API Documentation)
 
@@ -75,60 +75,36 @@ uvicorn main:app --reload
 ### Health Check
 - `GET /health` - 서비스 상태 확인
 
-### Items (CRUD Operations)
-- `GET /items` - 모든 아이템 조회
-- `GET /items/{item_id}` - 특정 아이템 조회
-- `POST /items` - 새 아이템 생성
-- `PUT /items/{item_id}` - 아이템 수정
-- `DELETE /items/{item_id}` - 아이템 삭제
+### EXIF
+- `POST /api/exif` - 업로드한 이미지의 EXIF 메타데이터 분석
+- `POST /api/exif/edit` - EXIF 값을 수정하거나 제거한 새로운 이미지를 반환
 
 ### 예제 요청 (Example Requests)
 
-#### 아이템 생성 (Create Item)
+#### EXIF 분석 (Analyze EXIF)
 ```bash
-curl -X POST "http://localhost:8000/items" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Example Item",
-    "description": "This is an example item",
-    "price": 29.99
-  }'
+curl -X POST "http://localhost:8000/api/exif" \
+  -F "file=@sample.jpg"
 ```
 
-#### 모든 아이템 조회 (Get All Items)
+#### EXIF 편집 (Edit EXIF)
 ```bash
-curl -X GET "http://localhost:8000/items"
-```
-
-#### 특정 아이템 조회 (Get Item by ID)
-```bash
-curl -X GET "http://localhost:8000/items/1"
-```
-
-#### 아이템 수정 (Update Item)
-```bash
-curl -X PUT "http://localhost:8000/items/1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Updated Item",
-    "price": 39.99
-  }'
-```
-
-#### 아이템 삭제 (Delete Item)
-```bash
-curl -X DELETE "http://localhost:8000/items/1"
+curl -X POST "http://localhost:8000/api/exif/edit" \
+  -F "file=@sample.jpg" \
+  -F 'updates={"Artist": "All-that-EXIF"}' \
+  -F 'removals=["UserComment"]'
 ```
 
 ## 프로젝트 구조 (Project Structure)
 
 ```
 fastapi-all-that-metadata/
-├── main.py              # Main application file
+├── main.py              # FastAPI application
+├── metadata_service.py  # 메타데이터 분석/편집 유틸리티
 ├── requirements.txt     # Python dependencies
-├── pyproject.toml      # Project metadata
-├── .gitignore          # Git ignore file
-└── README.md           # This file
+├── pyproject.toml       # Project metadata
+├── static/              # Front-end assets (HTML/JS/CSS)
+└── README.md            # This file
 ```
 
 ## 개발 (Development)

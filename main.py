@@ -1,147 +1,106 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime
+from __future__ import annotations
+
+import json
 import os
 
-# Create FastAPI app instance
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from metadata_service import (
+    MetadataError,
+    apply_exif_edits,
+    build_edit_response,
+    build_json_response,
+    extract_metadata,
+)
+
 app = FastAPI(
     title="FastAPI All That Metadata",
-    description="A basic FastAPI web service with essential metadata",
-    version="0.1.0",
+    description="이미지 파일의 EXIF 메타데이터를 분석하고 편집할 수 있는 서비스",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-# static 폴더를 / 경로에 연결
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Data models
-class Item(BaseModel):
-    id: Optional[int] = None
-    name: str
-    description: Optional[str] = None
-    price: float
-    created_at: Optional[datetime] = None
+MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB
 
-class ItemCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    price: float
 
-class ItemUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    price: Optional[float] = None
-
-# In-memory storage (for demonstration purposes)
-items_db: List[Item] = []
-item_id_counter = 1
-
-# 루트로 접속 시 index.html 반환
 @app.get("/")
-def serve_index():
+async def serve_index() -> FileResponse:
     return FileResponse(os.path.join("static", "index.html"))
 
-# # Root endpoint
-# @app.get("/", tags=["root"])
-# async def root():
-#     """
-#     Root endpoint that returns a welcome message.
-#     """
-#     return {
-#         "message": "Welcome to FastAPI All That Metadata",
-#         "version": "0.1.0",
-#         "docs": "/docs",
-#     }
+
+@app.get("/health", tags=["system"])
+async def health_check() -> dict[str, str]:
+    return {"status": "healthy"}
 
 
-# Health check endpoint
-@app.get("/health", tags=["health"])
-async def health_check():
-    """
-    Health check endpoint to verify the service is running.
-    """
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-    }
+@app.post("/api/exif", tags=["exif"])
+async def analyze_exif(file: UploadFile = File(...)) -> dict:
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="업로드된 파일이 비어 있습니다.")
+    if len(file_bytes) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="파일 용량이 25MB를 초과합니다.")
+
+    try:
+        result = extract_metadata(file_bytes, file.filename, file.content_type)
+    except MetadataError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail="메타데이터 분석에 실패했습니다.") from exc
+
+    return build_json_response(result)
 
 
-# Get all items
-@app.get("/items", response_model=List[Item], tags=["items"])
-async def get_items():
-    """
-    Retrieve all items from the database.
-    """
-    return items_db
+@app.post("/api/exif/edit", tags=["exif"])
+async def edit_exif(
+    file: UploadFile = File(...),
+    updates: str | None = Form(None, description="JSON 객체 형태의 수정할 EXIF 값"),
+    removals: str | None = Form(None, description="JSON 배열 형태의 삭제할 태그 이름"),
+) -> dict:
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="업로드된 파일이 비어 있습니다.")
+    if len(file_bytes) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="파일 용량이 25MB를 초과합니다.")
 
+    try:
+        parsed_updates = json.loads(updates) if updates else {}
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="updates 필드는 올바른 JSON 이어야 합니다.") from exc
 
-# Get a specific item by ID
-@app.get("/items/{item_id}", response_model=Item, tags=["items"])
-async def get_item(item_id: int):
-    """
-    Retrieve a specific item by its ID.
-    """
-    for item in items_db:
-        if item.id == item_id:
-            return item
-    raise HTTPException(status_code=404, detail="Item not found")
+    try:
+        parsed_removals = json.loads(removals) if removals else []
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="removals 필드는 올바른 JSON 배열이어야 합니다.") from exc
 
+    if not isinstance(parsed_updates, dict):
+        raise HTTPException(status_code=400, detail="updates 필드는 JSON 객체여야 합니다.")
+    if not isinstance(parsed_removals, list):
+        raise HTTPException(status_code=400, detail="removals 필드는 JSON 배열이어야 합니다.")
 
-# Create a new item
-@app.post("/items", response_model=Item, status_code=201, tags=["items"])
-async def create_item(item: ItemCreate):
-    """
-    Create a new item in the database.
-    """
-    global item_id_counter
-    
-    new_item = Item(
-        id=item_id_counter,
-        name=item.name,
-        description=item.description,
-        price=item.price,
-        created_at=datetime.now(),
-    )
-    items_db.append(new_item)
-    item_id_counter += 1
-    
-    return new_item
+    try:
+        original = extract_metadata(file_bytes, file.filename, file.content_type)
+        modified_bytes, updated = apply_exif_edits(
+            file_bytes,
+            original,
+            updates=parsed_updates,
+            removals=parsed_removals,
+        )
+    except MetadataError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail="EXIF 편집에 실패했습니다.") from exc
 
-
-# Update an existing item
-@app.put("/items/{item_id}", response_model=Item, tags=["items"])
-async def update_item(item_id: int, item_update: ItemUpdate):
-    """
-    Update an existing item by its ID.
-    """
-    for idx, item in enumerate(items_db):
-        if item.id == item_id:
-            updated_data = item_update.model_dump(exclude_unset=True)
-            updated_item = item.model_copy(update=updated_data)
-            items_db[idx] = updated_item
-            return updated_item
-    
-    raise HTTPException(status_code=404, detail="Item not found")
-
-
-# Delete an item
-@app.delete("/items/{item_id}", status_code=204, tags=["items"])
-async def delete_item(item_id: int):
-    """
-    Delete an item by its ID.
-    """
-    for idx, item in enumerate(items_db):
-        if item.id == item_id:
-            items_db.pop(idx)
-            return
-    
-    raise HTTPException(status_code=404, detail="Item not found")
+    return build_edit_response(modified_bytes, file.filename, updated)
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
