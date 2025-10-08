@@ -21,7 +21,7 @@ This project is a basic RESTful API web service using FastAPI. It includes examp
 
 ### Prerequisites
 
-- Python 3.8 이상 (Python 3.8 or higher)
+- Python 3.10 이상; 3.12 권장 (Python 3.10 or higher; 3.12 recommended)
 
 ### 설치 단계 (Installation Steps)
 
@@ -70,7 +70,7 @@ uvicorn main:app --reload
 ## API 엔드포인트 (API Endpoints)
 
 ### Root
-- `GET /` - 웰컴 메시지 반환
+- `GET /` - index.html 반환
 
 ### Health Check
 - `GET /health` - 서비스 상태 확인
