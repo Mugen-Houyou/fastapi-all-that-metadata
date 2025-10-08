@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>All-that-EXIF</title>
+  <link rel="stylesheet" href="./static/styles.css" />
+  <link rel="icon" href="data:;base64,=">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <svg aria-hidden="true" viewBox="0 0 24 24" class="logo">
+        <path d="M4 4h16v16H4z" fill="currentColor" opacity=".15"></path>
+        <path d="M7 9h10M7 13h6M7 17h3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <h1>All-that-EXIF</h1>
+    </div>
+    <div class="actions">
+      <label class="switch">
+        <input id="mockToggle" type="checkbox" />
+        <span class="slider"></span>
+        <span class="switch-label">Mock</span>
+      </label>
+      <button id="clearBtn" class="ghost">초기화</button>
+      <a class="ghost" href="https://exif.org/Exif2-2.PDF" target="_blank" rel="noopener">EXIF 스펙</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="uploader" aria-label="이미지 업로드">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="이미지 파일 드래그 앤 드롭 또는 클릭하여 선택">
+        <div class="dz-inner">
+          <div class="dz-icon">📸</div>
+          <div class="dz-title">이미지를 드래그 앤 드롭하거나 클릭해서 선택</div>
+          <div class="dz-sub">지원: JPEG, HEIC/HEIF*, PNG* · 최대 25MB<br/><small>* 포맷별 EXIF 보존 여부는 기기/앱에 따라 다릅니다.</small></div>
+          <input id="fileInput" type="file" accept="image/*" hidden />
+        </div>
+      </div>
+      <div class="controls">
+        <button id="selectBtn" class="primary">파일 선택</button>
+        <button id="analyzeBtn" class="primary" disabled>분석하기</button>
+      </div>
+      <div id="progressWrap" class="progress hidden" aria-live="polite">
+        <div id="progressBar" class="bar" style="width:0%"></div>
+        <span id="progressText" class="text">0%</span>
+      </div>
+      <p id="hint" class="hint">모바일의 경우 촬영 앱/편집 과정에서 메타데이터가 제거될 수 있어요.</p>
+    </section>
+
+    <section id="previewSection" class="preview hidden" aria-label="미리보기">
+      <img id="previewImg" alt="업로드한 이미지 미리보기" />
+      <div class="meta-cards">
+        <div class="card">
+          <h3>기본 정보</h3>
+          <dl id="basicInfo" class="kv"></dl>
+        </div>
+        <div class="card">
+          <h3>카메라</h3>
+          <dl id="cameraInfo" class="kv"></dl>
+        </div>
+        <div class="card">
+          <h3>촬영</h3>
+          <dl id="captureInfo" class="kv"></dl>
+        </div>
+        <div class="card">
+          <h3>GPS</h3>
+          <dl id="gpsInfo" class="kv"></dl>
+          <div id="mapLinkWrap" class="maplink hidden">
+            <a id="mapLink" target="_blank" rel="noopener">지도에서 보기</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="rawSection" class="raw hidden" aria-label="원본 메타데이터">
+      <details open>
+        <summary>RAW JSON 보기</summary>
+        <pre id="rawJson" class="code"></pre>
+      </details>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <small>© 2025 All-that-EXIF · Built with HTML/CSS/JS · 백엔드: FastAPI 예정</small>
+  </footer>
+
+  <template id="rowTpl">
+    <div class="row"><dt></dt><dd></dd></div>
+  </template>
+  <script src="./static/app.js" type="module"></script>
+</body>
+</html>

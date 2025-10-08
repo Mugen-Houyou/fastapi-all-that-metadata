@@ -1,7 +1,10 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+import os
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -11,6 +14,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# static 폴더를 / 경로에 연결
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Data models
 class Item(BaseModel):
@@ -34,18 +40,22 @@ class ItemUpdate(BaseModel):
 items_db: List[Item] = []
 item_id_counter = 1
 
+# 루트로 접속 시 index.html 반환
+@app.get("/")
+def serve_index():
+    return FileResponse(os.path.join("static", "index.html"))
 
-# Root endpoint
-@app.get("/", tags=["root"])
-async def root():
-    """
-    Root endpoint that returns a welcome message.
-    """
-    return {
-        "message": "Welcome to FastAPI All That Metadata",
-        "version": "0.1.0",
-        "docs": "/docs",
-    }
+# # Root endpoint
+# @app.get("/", tags=["root"])
+# async def root():
+#     """
+#     Root endpoint that returns a welcome message.
+#     """
+#     return {
+#         "message": "Welcome to FastAPI All That Metadata",
+#         "version": "0.1.0",
+#         "docs": "/docs",
+#     }
 
 
 # Health check endpoint
